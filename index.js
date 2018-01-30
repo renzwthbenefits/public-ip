@@ -1,16 +1,17 @@
 'use strict';
-const dgram = require('dgram');
-const dns = require('dns-socket');
-const got = require('got');
-const isIp = require('is-ip');
-const pify = require('pify');
 
-const defaults = {
+var dgram = require('dgram');
+var dns = require('dns-socket');
+var got = require('got');
+var isIp = require('is-ip');
+var pify = require('pify');
+
+var defaults = {
 	timeout: 5000,
 	https: false
 };
 
-const type = {
+var type = {
 	v4: {
 		dnsServer: '208.67.222.222',
 		dnsQuestion: {
@@ -29,56 +30,56 @@ const type = {
 	}
 };
 
-const queryDns = (version, opts) => {
-	const data = type[version];
+var queryDns = function queryDns(version, opts) {
+	var data = type[version];
 
-	const socket = dns({
+	var socket = dns({
 		retries: 0,
 		socket: dgram.createSocket(version === 'v6' ? 'udp6' : 'udp4'),
 		timeout: opts.timeout
 	});
 
-	const promise = pify(socket.query.bind(socket))({
+	var promise = pify(socket.query.bind(socket))({
 		questions: [data.dnsQuestion]
-	}, 53, data.dnsServer).then(res => {
+	}, 53, data.dnsServer).then(function (res) {
 		socket.destroy();
-		const ip = ((res.answers[0] && res.answers[0].data) || '').trim();
+		var ip = (res.answers[0] && res.answers[0].data || '').trim();
 
 		if (!ip || !isIp[version](ip)) {
 			throw new Error('Couldn\'t find your IP');
 		}
 
 		return ip;
-	}).catch(err => {
+	}).catch(function (err) {
 		socket.destroy();
 		throw err;
 	});
 
-	promise.cancel = () => {
+	promise.cancel = function () {
 		socket.cancel();
 	};
 
 	return promise;
 };
 
-const queryHttps = (version, opts) => {
-	const gotOpts = {
+var queryHttps = function queryHttps(version, opts) {
+	var gotOpts = {
 		family: version === 'v6' ? 6 : 4,
 		retries: 0,
 		timeout: opts.timeout
 	};
 
-	const gotPromise = got(type[version].httpsUrl, gotOpts);
+	var gotPromise = got(type[version].httpsUrl, gotOpts);
 
-	const promise = gotPromise.then(res => {
-		const ip = (res.body || '').trim();
+	var promise = gotPromise.then(function (res) {
+		var ip = (res.body || '').trim();
 
 		if (!ip) {
 			throw new Error('Couldn\'t find your IP');
 		}
 
 		return ip;
-	}).catch(err => {
+	}).catch(function (err) {
 		// Don't throw a cancellation error for consistency with DNS
 		if (!(err instanceof got.CancelError)) {
 			throw err;
@@ -90,7 +91,7 @@ const queryHttps = (version, opts) => {
 	return promise;
 };
 
-module.exports.v4 = opts => {
+module.exports.v4 = function (opts) {
 	opts = Object.assign({}, defaults, opts);
 
 	if (opts.https) {
@@ -100,7 +101,7 @@ module.exports.v4 = opts => {
 	return queryDns('v4', opts);
 };
 
-module.exports.v6 = opts => {
+module.exports.v6 = function (opts) {
 	opts = Object.assign({}, defaults, opts);
 
 	if (opts.https) {
